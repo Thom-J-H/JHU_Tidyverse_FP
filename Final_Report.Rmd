@@ -1,0 +1,502 @@
+---
+title: "Modelling Data in the Tidyverse Course Project"
+author: "Thomas J. Haslam"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.fullwidth = TRUE, fig.align = "center")
+```
+
+
+### Introduction
+This project uses data from the USA [Consumer Complaint Database (CFPB)](https://www.consumerfinance.gov/data-research/consumer-complaints/), with the following training and test data sets as determined by the [JHU](https://www.coursera.org/specializations/tidyverse-data-science-r) instructors:
+
+<ul>
+<li>[Data set: Training data -- complaints from CFPB (data_complaints_train.csv)](https://d3c33hcgiwev3.cloudfront.net/JhHJz2SSRCqRyc9kkgQqxA_8d34147955154de4a6176086946d07b3_data_complaints_train.csv?Expires=1626480000&Signature=X9~dD3MtVq9cNZtm6KVezI3gjJ29ZHGL5TxQXYSZkMyux1jmbyEkLSSzRBnxDBOqGH9UWpIkutoa0lKxaRsgm8nrfL6gaO5pJ5RufquUSSjL2quQU4DxzUhnUU0PrG6OxMs7LlIteUXyWB-MKrgW6UxmfpKjchZZnBOsHZSiE2w_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A)</li>
+
+<li>[Data set: Testing data -- complaints from CFPB (data_complaints_test.csv)](https://d3c33hcgiwev3.cloudfront.net/aEBWUxehSGyAVlMXoThsoQ_edf53641edca416fa00a78d9e4b16ced_data_complaints_test.csv?Expires=1626480000&Signature=VO6-go6rUbwghjAALkcEWhjRx8li8nqBB6jGNVTbmOoDZq5724P~pVy1JQpMGzKZ-s-IfeGg~4xUm5ybRmW3c9kzPzrxifYxPEhi6Q2pS6Yi2f4UBgpw6nREHKQUMPOyEASEPL1051j9mRaU-GpJCAGOD6~Ax118guj9gZ8zsHs_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A)</li>
+</ul>
+
+The central task is classification: "predict the consumer complaint category" or *Product*, which has four possible outcomes.  Those outcomes (no rank order):
+
+<ol>
+<li>Credit card or prepaid card</li>
+<li>Mortgage</li>
+<li>Student Loan</li>
+<li>Vehicle loan or lease</li>
+</ol>
+
+
+### Approach
+I took a ML approach that primarily uses the text data, but also includes one additional variable as a predictor. Hvitfledt and Silge (2021) demonstrate this possiblity in [Supervised Machine Learning for Text Analysis in R](https://smltar.com/mlclassification.html#case-study-including-non-text-data). Although core modelling for my project is based on text mining, the engine is [glmnet](https://glmnet.stanford.edu/articles/glmnet.html) so that I might include my additional variable.
+
+My additional variable, based upon my [EDA](https://r4ds.had.co.nz/exploratory-data-analysis.html?q=eda#introduction-3), is derived from the company data. My EDA revealed two interesting findings  First, out of 1497 distinct companies in the training data set, the vast majority are specialists -- each operates within one *Product* category. (Please see above list). Therefore, any complaint associated with that company must belong to that product category. Second, although the vast majority of companies listed are specialists, the vast majority of product offerings are made by mixed lenders: companies that do NOT specialize. 
+
+Still, my derived dummy variable before modelling helps classify roughly 20% of the training data.  So I add it and retain for both the training and test data during the modelling. If I can reduce 20% of the uncertainty before mining the text, I should do so. 
+
+Finally, for purposes of readability, I have set the generic code sections to `echo = FALSE`, but reveal and comment on the key code sections.  Obviously, the full code is in the RMD, but for the reading report (the HTML doc), do you really need to see me load the libraries?  Load the data? Do tedious generic Tidy tasks on the data?  It's all in the RMD.
+
+```{r libraries_one, echo = FALSE}
+library(tidyverse)
+library(here)
+library(janitor)
+library(tm)
+```
+
+
+```{r data, echo = FALSE}
+#load the data 
+data_complaints_train <- read_csv("data/final_project/data_complaints_train.csv")
+data_complaints_test <- read_csv("data/final_project/data_complaints_test.csv")
+
+```
+
+
+### Data Wrangling
+
+The data sets are untidy to start.  We need to correct the column (variable names), remove junk text such as "XX", remove numbers, remove unneeded line breaks, and (for my purposes) reset the variables `product` and `company` as factors. Finally, the `Consumer complaint narrative` will simply be renamed `complaint`, and variables not needed for modelling will be dropped.
+
+```{r glimpse}
+data_complaints_train %>% glimpse() 
+```
+
+
+```{r wrangle_dat, echo = FALSE }
+dc_train <- data_complaints_train %>% clean_names()
+dc_test <- data_complaints_test %>% clean_names()
+
+dc_train$product <- factor(dc_train$product)
+dc_train$company <- factor(dc_train$company)
+dc_test$company <- factor(dc_test$company)
+
+dc_train <- dc_train %>% 
+  rename(complaint = consumer_complaint_narrative )
+dc_test<- dc_test %>% 
+  rename(complaint = consumer_complaint_narrative )
+```
+
+
+
+```{r clean_text_more, echo = FALSE}
+dc_train$complaint  <-  str_replace_all(dc_train$complaint, "[XX]+", " ")
+dc_train$complaint  <-  str_replace_all(dc_train$complaint , "[xx]+", " ")
+dc_train$complaint  <-  str_replace_all(dc_train$complaint , "[^[:alnum:]]", " ")
+dc_train$complaint  <-  str_replace_all(dc_train$complaint , "\\d", " ")
+
+
+dc_test$complaint  <-  str_replace_all(dc_test$complaint, "[XX]+", " ")
+dc_test$complaint  <-  str_replace_all(dc_test$complaint , "[xx]+", " ")
+dc_test$complaint  <-  str_replace_all(dc_test$complaint , "[^[:alnum:]]", " ")
+dc_test$complaint  <-  str_replace_all(dc_test$complaint , "\\d", " ")
+```
+
+
+```{r chop_down,  echo = FALSE}
+dc_train <- dc_train %>% select(c(1:3))
+dc_test <- dc_test %>% select(c(1:3))
+```
+
+This now being done, we have the training and test data sets in Tidy form. Let's see the case for our new variable:
+
+```{r company_id}
+dc_train$company %>% 
+  n_distinct() 
+
+dc_train  %>% 
+  group_by(product) %>% 
+  distinct(company) %>% 
+  count()
+```
+
+We have 1497 distinct companies. But when grouped by product, we have a total of 1802 companies. Clearly, some companies offer more than one product; and likewise, some do not. We can use basic set theory to identify the specialists, and mixed lenders. This information will become our new dummy variable. 
+
+
+```{r by_product}
+product_company <- dc_train %>% 
+  group_by(product) %>% 
+  distinct(company) 
+
+credit_companies <- product_company %>% 
+  filter(product == "Credit card or prepaid card")
+
+mort_companies <- product_company %>% 
+  filter(product == "Mortgage")
+
+stu_companies <- product_company %>% 
+  filter(product == "Student loan")
+
+car_companies <- product_company %>% 
+  filter(product == "Vehicle loan or lease")
+```
+
+Now we create the exclusion sets, using the above. By default, mixed lenders will be excluded by the *product only* groups, but included in the *multi-product* groups. The *product only* group and its complementary group should have sum total of 1497 companies.  This check was done during earlier EDA.
+
+```{r set_theory}
+# Basic Set Theory
+cc_op <- bind_rows(mort_companies, stu_companies,  car_companies)
+cc_op$company %>% 
+  n_distinct() # with below should add to 1497
+
+cc_only <- credit_companies %>% 
+  anti_join(cc_op, by = "company") 
+cc_only %>% 
+  n_distinct()  # with above should add to 1497
+
+# Set again
+mort_op <-  bind_rows(credit_companies, stu_companies,  car_companies)
+# mort_op$company %>% n_distinct() # 783
+mort_only <- mort_companies %>% 
+  anti_join(mort_op , by = "company") 
+# mort_only %>% n_distinct() # 714
+
+# Set again
+stu_op <-  bind_rows(credit_companies, mort_companies, car_companies)
+# stu_op$company %>% n_distinct() # 1318
+stu_only <- stu_companies %>% 
+  anti_join(stu_op, by = "company") 
+# stu_only$company %>%  n_distinct()  179
+
+#Set again
+car_op <- bind_rows(credit_companies, mort_companies, stu_companies)
+# car_op$company %>% n_distinct() #  1233
+car_only <- car_companies %>% 
+  anti_join(car_op  , by = "company") 
+#car_only$company %>% n_distinct()  #  1233
+
+```
+
+For the record, this done during EDA, the breakdown is as follows: exclusively *Credit card or prepaid card*, 136 companies; exclusively *Mortgage*, 714 companies; exclusively *Student loans*, 179 companies; exclusively *Vehicle loan or lease*, 264 companies. So the number of companies which offer more than one product, the mixed lenders, is only 204.  But as we will see below, the mixed lenders make the vast majority of the loans.
+
+The table below breaks down the number of product offerings in the training data, and their ratios.
+
+```{r offerings_ratio, echo = FALSE}
+dc_train  %>% 
+  count(product) %>% 
+  mutate(ratio = n/sum(n))
+```
+
+Based on these insights, we can now create our new variable,`comp_domain` (which will later be changed to a numeric variable, `dummy_var`, for the glmnet engine). 
+
+```{r add_var}
+dc_train <- dc_train %>%
+  mutate(comp_domain = case_when(company %in% cc_only$company ~ "ccard_only",
+                                 company %in% stu_only$company ~ "student_only",
+                                 company %in% mort_only$company ~ "mort_only",
+                                 company %in% car_only$company ~ "auto_only",
+                                 TRUE ~ "mixed_lender") %>%
+           factor() )
+
+# now test
+dc_test <- dc_test %>%
+  mutate(comp_domain = case_when(company %in% cc_only$company ~ "ccard_only",
+                                 company %in% stu_only$company ~ "student_only",
+                                 company %in% mort_only$company ~ "mort_only",
+                                 company %in% car_only$company ~ "auto_only",
+                                 TRUE ~ "mixed_lender") %>%
+           factor() )
+```
+
+As the results below show, our new variable identifies roughly 20% of the training data set, and 25% of the test data set, with certainty. This is a useful predictor. Also, **please note** the results likewise show that the majority of product offerings are made by companies with the `mixed lender` classification.
+
+```{r comp_domain, echo = FALSE}
+
+#results
+dc_train %>% 
+  count(comp_domain) %>% 
+  mutate(ratio = n/sum(n)) %>%
+  knitr::kable(caption = "Training Data Results with New Var")
+# almost 20% identified
+
+#results
+dc_test %>% 
+  count(comp_domain)  %>% 
+  mutate(ratio = n/sum(n))  %>% 
+  knitr::kable(caption = "Test Data Results with New Var")
+
+```
+
+Any companies not identified as specialists, including those which might be present in the test data but not the training data, will by default be designated as `mixed_lender` in `comp_domain` var or as `0` in the model-friendly `dummy_var`.  
+
+```{r recode_var}
+# Create dummy var
+dc_train <- dc_train %>%
+  mutate(dummy_var = case_when(comp_domain == "ccard_only" ~ 4,
+                               comp_domain == "student_only" ~ 3,
+                               comp_domain == "mort_only" ~ 2,
+                               comp_domain == "auto_only" ~ 1,
+                               TRUE ~ 0)) 
+
+dc_test <- dc_test %>%
+  mutate(dummy_var = case_when(comp_domain == "ccard_only" ~ 4,
+                               comp_domain == "student_only" ~ 3,
+                               comp_domain == "mort_only" ~ 2,
+                               comp_domain == "auto_only" ~ 1,
+                               TRUE ~ 0)) 
+```
+
+We can now save the Tidy training and test data sets, clear the environment, and get to work on modelling.
+
+
+```{r save_load, echo = FALSE}
+save(dc_train, file = here::here("data", "final_project", "dc_train.rda"))
+save(dc_test,  file = here::here("data", "final_project", "dc_test.rda"))
+# clean out enivorment
+rm(list = ls())
+#load only needed data
+load( here::here("data", "final_project", "dc_train.rda"))
+load( here::here("data", "final_project", "dc_test.rda"))
+```
+
+
+## Modelling 
+
+This approach generally uses a Tidytext orientation embedded within the Tidymodels framework.  So I did not create a classic `dtm` or [Document Term Matrix](https://en.wikipedia.org/wiki/Document-term_matrix) to start. In fact, I will use the packages [hardhat](https://rdrr.io/cran/hardhat/man/default_recipe_blueprint.html) and [textrecipes](https://rdrr.io/cran/textrecipes/) to create a [dgCMatrix](https://www.rdocumentation.org/packages/Matrix/versions/1.3-4/topics/dgCMatrix-class) which in turn will derive from the [count and tf-idf](https://www.tidytextmining.com/tfidf.html) values of the `complaint` text.  This is less intuitive than the older approach, but has other advantages.  Again, it allows me to add a non-text variable, my `dummy_var` indicating company specialization; and it allows me to use a [lasso model from glmnet](https://glmnet.stanford.edu/articles/relax.html).
+
+
+
+```{r libraries_two, echo = FALSE}
+library(tidytext)
+library(tidymodels)
+library(textrecipes)
+library(themis)
+library(hardhat)
+```
+
+### Blueprint and Penalty
+This section might appears out of order. It sequentially comes between creating the cross validation folds, and then defining the specification and workflow. But if I have not worked these out, at least mentally, then  I should not create a recipe first. I need to know where the recipe is going! So I include them here, and also acknowledge I am building on proven examples by [Hvitfeldt and Silge (2021)](https://smltar.com/).
+
+The text will be tokenized and then tf-idf weighted to produce the sparse `dgCMatrix` mentioned earlier.  The model will be assigned a penalty to [assist in shrinkage](https://yuyangyy.medium.com/understand-penalty-factor-in-glmnet-9fb873f9045b), which helps us find the persistently important predictors among possible variables.
+
+
+```{r set_pars}
+sparse_bp <- default_recipe_blueprint(composition = "dgCMatrix")
+
+smaller_lambda <- grid_regular(penalty(range = c(-4, 0)), levels = 10)
+
+```
+
+### Recipe
+
+Recipe time. We retain `dummy_var` and then break down the `complaint` variable text strings for text mining. The strings to word-tokens will make up the bulk of the matrix: the possible predictors. We have the penalty and filter to help shrink the data set: to counteract the [*curse of dimensionality*](https://en.wikipedia.org/wiki/Curse_of_dimensionality). 
+
+#### Unbalanced Data?
+Please note that roughly 42% of the product offerings for *Credit card or prepaid card* whereas  only 10% are for *Student loan*.  Because the data set might seem [unbalanced](https://themis.tidymodels.org/index.html), I could add `themis::step_downsample(product)` to the recipe to adjust the number observations considered per category level.  
+
+I have tested this. I get a better overall accuracy score without it, but notably poorer results for *Vehicle loan or Lease*: so a clear trade-off. I suspect the overall accuracy improves in part because the majority of offerings are either *Credit card or prepaid card* or *Mortgage*: almost 80%. No right answer here -- only an informed decision to be made. I am not adding the additional step. Since in the training data I have at least 9000 observations for my smallest category level, I am trusting that when the CV chop comes I will still have enough in each fold for the model to chew on. Again, this decision could go either way.
+
+
+```{r recipe}
+run_one <- recipe(product ~ complaint + dummy_var ,
+                  data = dc_train) %>%
+  step_tokenize(complaint) %>%
+  step_tokenfilter(complaint, max_tokens = 1e3) %>%
+  step_tfidf(complaint) #%>%
+  #themis::step_downsample(product)
+
+```
+
+
+### CV Folds
+
+Model was tested using 5 and 10 CV folds.  Quite frankly, not much difference with the final accuracy results. I am submitting the final report with the generally preferred number of 10 folds which does yield marginally better results.
+
+```{r cross_val_folds}
+set.seed(2023)
+run_one_folds <- vfold_cv(dc_train, v = 10)
+
+```
+
+### Model Spec and Workflow
+Set the spec, define the workflow, and bring it all together.
+
+
+```{r spec_wf}
+run_one_spec <- multinom_reg(penalty = tune(), mixture = 1) %>%
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+
+run1_lasso_wf <- workflow() %>%
+  add_recipe(run_one, blueprint = sparse_bp) %>%
+  add_model(run_one_spec)
+
+run1_lasso_wf 
+```
+
+### Run Time
+Please note this can take over 1/2 hour. Knitting the markdown file might require you to restart R first, or even restart your laptop or desktop.  
+
+```{r big_time_run}
+set.seed(2023)
+library(doParallel)
+doParallel::registerDoParallel()
+
+run1_lasso_rs <- tune_grid(
+  run1_lasso_wf ,
+  run_one_folds ,
+  grid = smaller_lambda,
+  control = control_resamples(save_pred = TRUE)
+)
+
+
+run1_lasso_rs  
+```
+
+
+### Results and Best Model
+
+We have results from cross validation across 10 folds. Let's view the results. To choose my final model, I will use the `select_by_one_std_err()` function with the metric set to `accuracy`.  This will select "the most simple model that is within one standard error of the numerically optimal results" |[ref](https://tune.tidymodels.org/reference/show_best.html)|. Please note that other choices could be made, depending on your project and preferences.
+
+
+```{r get_best}
+best_acc <- run1_lasso_rs %>%
+  show_best("accuracy")
+
+best_acc %>% knitr::kable(caption = "Models ranked by Accuracy")
+
+choose_acc <- run1_lasso_rs %>% 
+  select_by_one_std_err(metric = "accuracy", -penalty)
+
+choose_acc %>% knitr::kable(caption = "Selected Final Model")
+
+```
+
+### Results Report as Confusion Matrix I
+
+So we have a top accuracy rate of nearly 95%. Quite good, but let's put it in context by plotting the Confusion Matrix.  The accuracy score is the mean (average) of results over all 10 folds, but it works better to plot one fold (one data subset) at a time. I will chose fold 05 out of 10.
+
+
+```{r confusion_matrix}
+
+run1_lasso_rs  %>%
+  collect_predictions() %>%
+  filter(penalty == best_acc$penalty) %>%
+  filter(id == "Fold05") %>%
+  conf_mat(product, .pred_class) %>%
+  autoplot(type = "heatmap") +
+  scale_y_discrete(labels = function(x) str_wrap(x, 20)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, 20)) +
+  scale_fill_gradient(low = "#FFFAFA", high = "#006400") +
+  ggtitle("CM: Best Model (Accuracy)", subtitle = "Data from Fold 5 of 10")
+
+
+
+```
+
+
+If we want to read up (down) the Truth column, this will tell the true number of product offerings (the column sum) and the correct number of identifications (where the Prediction row matches the Truth column). From this we can deduce the rate.
+
+```{r glance_one, echo = FALSE}
+
+cm_table <-  run1_lasso_rs  %>%
+  collect_predictions() %>%
+  filter(penalty == best_acc$penalty) %>%
+  filter(id == "Fold05") %>%
+  conf_mat(product, .pred_class)
+
+cm <- cm_table[["table"]] 
+credit_card_tp <- cm[1 ,1] / sum(cm[ ,1])
+mortage_tp <- cm[2,2] / sum(cm[ ,2])
+stu_loan_tp <- cm[3,3] / sum(cm[ ,3])
+car_loan_tp <- cm[4,4] / sum(cm[ ,4])
+
+quick_glance <- data.frame("Credit_Card" = credit_card_tp,
+                           "Mortage" = mortage_tp,
+                           "Student_Loan" = stu_loan_tp,
+                           "Vehicle_LL" = car_loan_tp)
+
+quick_glance %>% knitr::kable(caption = "CM: Correct Identification Rate")
+```
+
+For our model, *Mortgage* has the top score; *Vehicle loan or lease*, the bottom. This suggests that `complaint` language for *Vehicle loan or lease* might not be particularly distinctive.  The category *Vehicle loan or lease* has the fewest product offers, but the greatest number of errors in classification.
+
+If we read across the Prediction rows, we can calculate the [False Positive](https://en.wikipedia.org/wiki/False_positives_and_false_negatives) rates for each category.
+
+```{r false_pos, echo = FALSE}
+
+credit_card_fp <- 1 - (cm[1 ,1] / sum(cm[1, ]) )
+mortage_fp <- 1 - (cm[2,2] / sum(cm[2, ]) )
+stu_loan_fp <- 1 - (cm[3,3] / sum(cm[3, ]))
+car_loan_fp <- 1 - (cm[4,4] / sum(cm[4, ]))
+
+
+
+quick_glance_fp <- data.frame("Credit_Card" = credit_card_fp,
+                           "Mortage" = mortage_fp,
+                           "Student_Loan" = stu_loan_fp,
+                           "Vehicle_LL" = car_loan_fp)
+
+
+quick_glance_fp %>% 
+  knitr::kable(caption = "CM: False Postive Rates")
+```
+
+Perhaps not surprisingly, *Mortgage* has the lowest False Positive rate;  *Vehicle loan or lease* has the highest: roughly, 11%; *Credit card or prepaid card*, roughly 6.6%; and *Student loans*, roughly 4.5%.
+
+### Results Report as Confusion Matrix II
+
+We might be more interested in where our model went wrong. Let's plot the Confusion Matrix including only the mistaken identifications.
+
+```{r mistake_id}
+run1_lasso_rs  %>%
+  collect_predictions() %>%
+  filter(penalty == best_acc$penalty) %>%
+  filter(.pred_class != product) %>%
+  filter(id == "Fold05") %>%
+  conf_mat(product, .pred_class) %>%
+  autoplot(type = "heatmap") +
+  scale_y_discrete(labels = function(x) str_wrap(x, 20)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, 20)) +
+  scale_fill_gradient(low = "#FFFAFA", high = "#FF0000") +
+  ggtitle("CM: Mistaken Identifications", subtitle = "Data from Fold 5 of 10")
+```
+
+
+The strongest red squares showing the count are across the top row. So when any of the other three products are classified wrongly, and particularly *Vehicle loan or lease*, that mistake is more likely to be mis-classified as *Credit card or prepaid card*.  This result is not surprising as *Credit card or prepaid card* represents 42% -- the largest proportion -- of product offerings in the training data. So it presents the best option when model needs make a borderline decision. But as we saw above, in terms of proportional percentages, *Vehicle loan or lease* has the most false positives.
+
+
+(*Please note*: these two sections above, Confusion Matrix I & II, should be understood as my required comments on "the expected out of sample error."  I earlier discussed my use of cross validation, and model development and selection of final model.)
+
+### Predictions on Test Data
+
+Balancing simplicity and accuracy,`select_by_one_std_err()` was used earlier to determine the final model. Now, time to finalize the workflow, fit the model, and then run it to predict (**classify**) the test set `problem_id` cases.
+
+```{r final_model}
+final_wf <- finalize_workflow(run1_lasso_wf, choose_acc)
+
+final_model <- fit(final_wf, dc_train)
+
+results <- predict(final_model,  dc_test) 
+
+results$problem_id <- dc_test$problem_id
+
+results %>% 
+  select(problem_id, .pred_class)  %>% 
+  knitr::kable(caption ="Prediction Results on Test Data Set")
+
+```
+
+And that wraps it up.  From this [specialization](https://jhudatascience.org/tidyversecourse/), I learned new things that I now use everything I use R.  It has been an adventure!  Thank you for reading.  Credit to [Carrie Wright, Shannon E. Ellis, Stephanie C. Hicks and Roger D. Peng](https://universities.leanpub.com/tidyverseskillsdatascience) for the courses and instruction.
+
+### End
+
+<hr />
+<div style = "background-color: #F0F8FF; padding: 1em;">
+<p>
+Originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  This version, with typos corrected and session information added, sent to Github on `r Sys.Date()` @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).
+</p>
+</div>
+<hr />
+
+#### Session Info
+```{r package info, echo = FALSE}
+ses_info <- sessioninfo::package_info() %>% tibble() 
+ses_info %>% select(c(1,3,8,9))
+```
+
+
