@@ -22,6 +22,7 @@ It was originally submitted on 15 July 2021 in partial fulfillment for the [JHU 
 ![download](https://user-images.githubusercontent.com/12042357/126038663-c1dd5163-d642-4136-a787-09f3ca011c81.png)
 
 <hr />
-Credit to [Carrie Wright,et alis](https://universities.leanpub.com/tidyverseskillsdatascience) for the outstanding courses and instruction in this specialization. I learned things that I now use every time I use R.  
+
+Credit to [Carrie Wright, Shannon E. Ellis, Stephanie C. Hicks, and Roger D. Peng](https://universities.leanpub.com/tidyverseskillsdatascience) for the outstanding courses and instruction in this specialization. I learned things that I now use every time I use R.  
 
 I also found most helpful Hvitfledt and Silge (2021),  [Supervised Machine Learning for Text Analysis in R](https://smltar.com/); and of course, Silge and Robinson (2018; 2021),  [Text Mining with R: A Tidy Approach](https://www.tidytextmining.com/index.html).
