@@ -18,6 +18,7 @@ The central task is classification: "predict the consumer complaint category" or
 It was originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  This version, with typos corrected and session information added, sent to Github on 17 July 2021  @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).
 
 <hr />
+
 ![download](https://user-images.githubusercontent.com/12042357/126038663-c1dd5163-d642-4136-a787-09f3ca011c81.png)
 
 <hr />
