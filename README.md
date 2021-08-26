@@ -18,13 +18,14 @@ The central task is classification: "predict the consumer complaint category" or
 <li>Vehicle loan or lease</li>
 </ol>
 
-This report was originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  This version, with typos corrected and session information added, sent to Github on 17 July 2021  @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).  Reader report at RPubs: [Modelling Data in the Tidyverse Course Project](https://rpubs.com/Thom_JH/Tidyverse_Course_Project). 
-
+This report was originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  
 <hr />
 
 ![download](https://user-images.githubusercontent.com/12042357/126038663-c1dd5163-d642-4136-a787-09f3ca011c81.png)
 
 <hr />
+
+This version, with typos corrected and session information added, sent to Github on 17 July 2021  @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).  Reader report at RPubs: [Modelling Data in the Tidyverse Course Project](https://rpubs.com/Thom_JH/Tidyverse_Course_Project). 
 
 Credit to [Carrie Wright, Shannon E. Ellis, Stephanie C. Hicks, and Roger D. Peng](https://universities.leanpub.com/tidyverseskillsdatascience) for the outstanding courses and instruction in this specialization. I learned things that I now use every time I use R.  
 
