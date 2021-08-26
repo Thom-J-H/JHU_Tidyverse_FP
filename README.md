@@ -1,4 +1,7 @@
 # JHU_Tidyverse_FP
+
+Please find the final report in a reader-friendly format at RPubs: [Modelling Data in the Tidyverse Course Project](https://rpubs.com/Thom_JH/Tidyverse_Course_Project). 
+
 This project uses data from the USA [Consumer Complaint Database (CFPB)](https://www.consumerfinance.gov/data-research/consumer-complaints/), with the following training and test data sets as determined by the [JHU](https://www.coursera.org/specializations/tidyverse-data-science-r) instructors:
 
 * [Data set: Training data -- complaints from CFPB](https://d3c33hcgiwev3.cloudfront.net/JhHJz2SSRCqRyc9kkgQqxA_8d34147955154de4a6176086946d07b3_data_complaints_train.csv?Expires=1626480000&Signature=X9~dD3MtVq9cNZtm6KVezI3gjJ29ZHGL5TxQXYSZkMyux1jmbyEkLSSzRBnxDBOqGH9UWpIkutoa0lKxaRsgm8nrfL6gaO5pJ5RufquUSSjL2quQU4DxzUhnUU0PrG6OxMs7LlIteUXyWB-MKrgW6UxmfpKjchZZnBOsHZSiE2w_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A)</li>
@@ -15,7 +18,7 @@ The central task is classification: "predict the consumer complaint category" or
 <li>Vehicle loan or lease</li>
 </ol>
 
-This report was originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  This version, with typos corrected and session information added, sent to Github on 17 July 2021  @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).
+This report was originally submitted on 15 July 2021 in partial fulfillment for the [JHU Tidyverse Skills for Data Science in R specialization](https://www.coursera.org/specializations/tidyverse-data-science-r) at Coursera.  This version, with typos corrected and session information added, sent to Github on 17 July 2021  @ [github.com/Thom-J-H/JHU_Tidyverse_FP](https://github.com/Thom-J-H/JHU_Tidyverse_FP).  Reader report at RPubs: [Modelling Data in the Tidyverse Course Project](https://rpubs.com/Thom_JH/Tidyverse_Course_Project). 
 
 <hr />
 
